@@ -16,7 +16,6 @@ import (
 
 func main() {
 	fmt.Println("gordon")
-	fmt.Println(rootDocID)
 
 	gordon := Server{
 		pages: map[uuid.UUID]types.Page{
@@ -25,7 +24,7 @@ func main() {
 		},
 	}
 
-	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 4444}
+	addr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: 4444}
 	certificate, err := selfsign.GenerateSelfSigned()
 	if err != nil {
 		panic(err)

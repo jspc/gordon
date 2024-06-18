@@ -48,8 +48,7 @@ The definition for Gordon documents can be found in the git repo, or at [l:0].
 	},
 	Links: []types.PageRef{
 		{
-			Page:        mintDocID,
-			DisplayText: "the Mint DDL page",
+			Page: mintDocID,
 		},
 	},
 	Relationships: []types.Relationship{
