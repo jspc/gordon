@@ -44,6 +44,7 @@ func (s Server) indexPage() (p types.Page) {
 			Published: time.Now(),
 		},
 		Sections: make([]types.Section, 0),
+		Links:    make([]types.PageRef, 0),
 		Tags:     []string{"index"},
 	}
 
@@ -51,6 +52,10 @@ func (s Server) indexPage() (p types.Page) {
 		p.Sections = append(p.Sections, types.Section{
 			Title: id.String(),
 			Body:  pageSummary(page),
+		})
+
+		p.Links = append(p.Links, types.PageRef{
+			Page: id,
 		})
 	}
 
