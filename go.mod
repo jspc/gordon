@@ -8,7 +8,7 @@ require (
 	github.com/pion/dtls/v2 v2.2.11
 	github.com/vinyl-linux/mint v0.3.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.7.0
 )
 
 require (
