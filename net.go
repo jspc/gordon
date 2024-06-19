@@ -1,4 +1,4 @@
-package main
+package gordon
 
 import (
 	"bytes"
@@ -14,25 +14,51 @@ import (
 )
 
 const (
-	maxWorkers int64 = 1024
-	networkUDP       = "udp"
+	defaultMaxWorkers int64 = 1024
+	networkUDP              = "udp"
 )
 
+// A Handler responds to Gordon Requests with either a Page or an error
+//
+// This is the absolute minimum a Gordon Server implementation must provide
+// to be able to serve documentation to users
 type Handler interface {
-	Serve(req *types.Request) (resp types.Page, err error)
+	Serve(req *types.Request) (resp *types.Page, err error)
 }
 
+// A Listener wraps a Handler and a TLS Certificate and does all of the
+// networky stuff
+//
+// This type should not be copied; it contains (amongst other things) a
+// reference to a weighted semaphore- if you try to copy it or duplicate
+// it then you'll end up with very strange behaviour
 type Listener struct {
 	handler        Handler
-	requestPool    *semaphore.Weighted
+	listener       net.Listener
 	listenerConfig *dtls.Config
 	logger         *zap.Logger
+	requestPool    *semaphore.Weighted
+
+	MaxConnections int64
 }
 
+// NewListener accepts a Handler and a Certificate and configures a Listener
+// ahead of `ListenAndServe` being called
+//
+// This call sets up a default MaxConnections size which may be overwritten
+// afterwards, as per
+//
+//	l, _ := gordon.NewListener(someServer{}, someCert)
+//	l.MaxConnections = 10
+//
+// The default size is 1024, which may be stupidly, ridiculously, overly
+// large.
 func NewListener(h Handler, cert tls.Certificate) (l Listener, err error) {
-	ctx := context.Background()
+	l.MaxConnections = defaultMaxWorkers
 
 	l.handler = h
+
+	ctx := context.Background()
 	l.listenerConfig = &dtls.Config{
 		Certificates:         []tls.Certificate{cert},
 		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
@@ -41,25 +67,33 @@ func NewListener(h Handler, cert tls.Certificate) (l Listener, err error) {
 		},
 	}
 
-	l.requestPool = semaphore.NewWeighted(maxWorkers)
 	l.logger, err = zap.NewProduction()
 
 	return
 }
 
+// ListenAndServe creates a DTLS listener against the provided address,
+// and handles Marshalling and Unmarshalling mint documents into Gordon
+// types.
+//
+// This function will propagate errors creating a DTLS listener to the
+// gordon implementation; any error in processing data, or any error returned
+// from a Handler, is logged and moved on from.
 func (l *Listener) ListenAndServe(address string) (err error) {
 	addr, err := net.ResolveUDPAddr(networkUDP, address)
 	if err != nil {
 		return
 	}
 
-	s, err := dtls.Listen(networkUDP, addr, l.listenerConfig)
+	l.listener, err = dtls.Listen(networkUDP, addr, l.listenerConfig)
 	if err != nil {
 		return
 	}
 
+	l.requestPool = semaphore.NewWeighted(l.MaxConnections)
+
 	for {
-		conn, err := s.Accept()
+		conn, err := l.listener.Accept()
 		if err != nil {
 			l.logger.Error(err.Error())
 
@@ -71,14 +105,22 @@ func (l *Listener) ListenAndServe(address string) (err error) {
 			l.connErr(conn, err)
 
 			conn.Close()
+
+			return err
 		}
 
 		go l.process(conn)
 	}
 }
 
+// Close the underlying UDP listener
+func (l Listener) Close() error {
+	return l.listener.Close()
+}
+
 func (l *Listener) process(conn net.Conn) {
 	defer l.requestPool.Release(1)
+	defer conn.Close()
 
 	start := time.Now()
 
@@ -103,6 +145,12 @@ func (l *Listener) process(conn net.Conn) {
 	resp, err := l.handler.Serve(req)
 	if err != nil {
 		l.connErr(conn, err)
+
+		return
+	}
+
+	if resp == nil {
+		l.connErr(conn, new(NilPageError))
 
 		return
 	}
@@ -153,4 +201,9 @@ func verbToString(v types.Verb) string {
 	}
 
 	return "unknown"
+}
+
+func isValidVerb(v types.Verb) bool {
+	return v > types.VerbUnknown &&
+		v <= types.VerbDelete
 }

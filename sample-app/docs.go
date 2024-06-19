@@ -12,7 +12,7 @@ var (
 	mintDocID = uuid.FromStringOrNil("996b046f-11d2-41c9-8b45-9294c7215e38")
 )
 
-var rootDoc = types.Page{
+var rootDoc = &types.Page{
 	Meta: types.Metadata{
 		ID:        rootDocID,
 		Author:    "jspc",
@@ -65,7 +65,7 @@ The definition for Gordon documents can be found in the git repo, or at [l:0].
 	Status: types.StatusOK,
 }
 
-var mintDoc = types.Page{
+var mintDoc = &types.Page{
 	Meta: types.Metadata{
 		ID:        mintDocID,
 		Author:    "jspc",
