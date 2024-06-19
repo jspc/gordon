@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"time"
 
@@ -104,9 +105,7 @@ func (l *Listener) ListenAndServe(address string) (err error) {
 		if err != nil {
 			l.connErr(conn, err)
 
-			conn.Close()
-
-			return err
+			return errors.Join(err, l.Close())
 		}
 
 		go l.process(conn)
@@ -170,7 +169,7 @@ func (l *Listener) process(conn net.Conn) {
 		return
 	}
 
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	l.logger.Info("Request",
 		zap.String("verb", verbToString(req.Verb)),
 		zap.String("document", req.ID.String()),

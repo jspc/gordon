@@ -34,5 +34,6 @@ func main() {
 		panic(err)
 	}
 
+	//#nosec: G104
 	pretty.Print(page)
 }
