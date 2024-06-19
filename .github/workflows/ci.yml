@@ -7,8 +7,6 @@ on:
     tags:
       - '*'
 
-permissions: read-all
-
 jobs:
   test:
     runs-on: ubuntu-latest
