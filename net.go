@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"log"
 	"net"
 	"time"
 
 	"github.com/jspc/gordon/types"
 	"github.com/pion/dtls/v2"
+	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -26,6 +26,7 @@ type Listener struct {
 	handler        Handler
 	requestPool    *semaphore.Weighted
 	listenerConfig *dtls.Config
+	logger         *zap.Logger
 }
 
 func NewListener(h Handler, cert tls.Certificate) (l Listener, err error) {
@@ -41,6 +42,7 @@ func NewListener(h Handler, cert tls.Certificate) (l Listener, err error) {
 	}
 
 	l.requestPool = semaphore.NewWeighted(maxWorkers)
+	l.logger, err = zap.NewProduction()
 
 	return
 }
@@ -59,12 +61,14 @@ func (l *Listener) ListenAndServe(address string) (err error) {
 	for {
 		conn, err := s.Accept()
 		if err != nil {
+			l.logger.Error(err.Error())
+
 			return err
 		}
 
 		err = l.requestPool.Acquire(context.Background(), 1)
 		if err != nil {
-			connErr(conn, err)
+			l.connErr(conn, err)
 
 			conn.Close()
 		}
@@ -81,7 +85,7 @@ func (l *Listener) process(conn net.Conn) {
 	data := make([]byte, 1024)
 	_, err := conn.Read(data)
 	if err != nil {
-		connErr(conn, err)
+		l.connErr(conn, err)
 
 		return
 	}
@@ -91,14 +95,14 @@ func (l *Listener) process(conn net.Conn) {
 
 	err = req.Unmarshall(buf)
 	if err != nil {
-		connErr(conn, err)
+		l.connErr(conn, err)
 
 		return
 	}
 
 	resp, err := l.handler.Serve(req)
 	if err != nil {
-		connErr(conn, err)
+		l.connErr(conn, err)
 
 		return
 	}
@@ -106,27 +110,47 @@ func (l *Listener) process(conn net.Conn) {
 	buf = new(bytes.Buffer)
 	err = resp.Marshall(buf)
 	if err != nil {
-		connErr(conn, err)
+		l.connErr(conn, err)
 
 		return
 	}
 
 	_, err = conn.Write(buf.Bytes())
 	if err != nil {
-		connErr(conn, err)
+		l.connErr(conn, err)
 
 		return
 	}
 
 	duration := time.Now().Sub(start)
-	log.Printf("%q %v %q %q",
-		conn.RemoteAddr().String(),
-		req.Verb,
-		req.ID,
-		duration.String(),
+	l.logger.Info("Request",
+		zap.String("verb", verbToString(req.Verb)),
+		zap.String("document", req.ID.String()),
+		zap.String("remote_address", conn.RemoteAddr().String()),
+		zap.Duration("duration", duration),
+		zap.Bool("is_error", resp.Status == types.StatusError),
+		zap.Int("size", buf.Len()),
 	)
 }
 
-func connErr(conn net.Conn, err error) {
-	log.Printf("%s %s", conn.RemoteAddr().String(), err.Error())
+func (l Listener) connErr(conn net.Conn, err error) {
+	l.logger.Error(err.Error(),
+		zap.Error(err),
+		zap.String("RemoteAddress", conn.RemoteAddr().String()),
+	)
+}
+
+func verbToString(v types.Verb) string {
+	switch v {
+	case types.VerbCreate:
+		return "create"
+	case types.VerbRead:
+		return "read"
+	case types.VerbUpdate:
+		return "update"
+	case types.VerbDelete:
+		return "delete"
+	}
+
+	return "unknown"
 }
