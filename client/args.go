@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"errors"
@@ -11,14 +11,35 @@ import (
 )
 
 type Address struct {
+	orig string
+
 	addr  *net.UDPAddr
 	docID uuid.UUID
 }
 
+func (a Address) String() string {
+	return a.orig
+}
+
+func (a Address) Server() string {
+	return a.addr.AddrPort().String()
+}
+
+func (a Address) Page() string {
+	return a.docID.String()
+}
+
 func ParseAddress(s string) (a Address, err error) {
+	a.orig = s
+
 	u, err := url.Parse(s)
 	if err != nil {
 		return
+	}
+
+	// Set default port to 4444
+	if !strings.Contains(u.Host, ":") {
+		u.Host += ":4444"
 	}
 
 	a.addr, err = net.ResolveUDPAddr("udp", u.Host)
