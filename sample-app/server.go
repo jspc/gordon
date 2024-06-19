@@ -9,10 +9,10 @@ import (
 )
 
 type Server struct {
-	pages map[uuid.UUID]types.Page
+	pages map[uuid.UUID]*types.Page
 }
 
-func (s Server) Serve(req *types.Request) (resp types.Page, err error) {
+func (s Server) Serve(req *types.Request) (resp *types.Page, err error) {
 	switch req.Verb {
 	case types.VerbRead:
 		return s.serveRead(req)
@@ -22,7 +22,7 @@ func (s Server) Serve(req *types.Request) (resp types.Page, err error) {
 	}
 }
 
-func (s Server) serveRead(req *types.Request) (resp types.Page, err error) {
+func (s Server) serveRead(req *types.Request) (resp *types.Page, err error) {
 	if req.ID.IsNil() {
 		return s.indexPage(), nil
 	}
@@ -35,8 +35,8 @@ func (s Server) serveRead(req *types.Request) (resp types.Page, err error) {
 	return s.pageNotFound(req.ID), nil
 }
 
-func (s Server) indexPage() (p types.Page) {
-	p = types.Page{
+func (s Server) indexPage() (p *types.Page) {
+	p = &types.Page{
 		Title:  "Page Index",
 		Status: types.StatusOK,
 		Meta: types.Metadata{
@@ -62,16 +62,16 @@ func (s Server) indexPage() (p types.Page) {
 	return
 }
 
-func (s Server) pageNotFound(id uuid.UUID) types.Page {
+func (s Server) pageNotFound(id uuid.UUID) *types.Page {
 	return s.error(id, "Page Not Found")
 }
 
-func (s Server) verbNotSupported(id uuid.UUID) types.Page {
+func (s Server) verbNotSupported(id uuid.UUID) *types.Page {
 	return s.error(id, "Verb Not Supported")
 }
 
-func (s Server) error(id uuid.UUID, msg string) types.Page {
-	return types.Page{
+func (s Server) error(id uuid.UUID, msg string) *types.Page {
+	return &types.Page{
 		Title:  msg,
 		Status: types.StatusError,
 		Meta: types.Metadata{
@@ -83,6 +83,6 @@ func (s Server) error(id uuid.UUID, msg string) types.Page {
 
 }
 
-func pageSummary(p types.Page) string {
+func pageSummary(p *types.Page) string {
 	return fmt.Sprintf("%s\n\nPublished Last by %s (%s)\n", p.Preamble, p.Meta.Author, p.Meta.Published)
 }

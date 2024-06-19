@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	mint "github.com/vinyl-linux/mint"
 	"io"
 )
@@ -16,6 +17,9 @@ const (
 )
 
 func (sf Predicate) Marshall(w io.Writer) (err error) {
+	if sf < 1 || sf > 4 {
+		return errors.New("invalid value for type Predicate")
+	}
 	return mint.NewByteScalar(byte(sf)).Marshall(w)
 }
 func (sf *Predicate) Unmarshall(r io.Reader) (err error) {
@@ -25,6 +29,9 @@ func (sf *Predicate) Unmarshall(r io.Reader) (err error) {
 		return
 	}
 	*sf = Predicate(f.Value().(byte))
+	if *sf < 1 || *sf > 4 {
+		return errors.New("invalid value for type Predicate")
+	}
 	return
 }
 func (sf Predicate) Value() any {
