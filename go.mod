@@ -5,7 +5,7 @@ go 1.22.3
 require (
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/kr/pretty v0.3.1
-	github.com/pion/dtls/v2 v2.2.11
+	github.com/pion/dtls/v2 v2.2.12
 	github.com/vinyl-linux/mint v0.4.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.7.0
